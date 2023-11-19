@@ -36,7 +36,7 @@ class PolicyIteration:
         for s_prime in self.allowed_states:
             Q_s_a += self.mdp.get_transition_prob(s, a, s_prime) * (self.mdp.get_reward(s, a, s_prime) + self.gamma * self.V[s_prime])
         return Q_s_a
-    
+
     def __evaluate_policy(self):
         """ Estimate the on policy value function for the current policy """
         # Initialize the value function to 0
@@ -71,18 +71,20 @@ class PolicyIteration:
         Returns:
             - Optimum policy obtained using policy iteration
             - Mean change in the policy
-            - State value for optimum policy
+            - Mean state values as the iteration processes
         """
         mean_policy_changes = []
+        mean_state_values = []
         while True:
             # Policy evaluation
             self.__evaluate_policy()
+            mean_state_values.append(sum(self.V.values())/len(self.V))
             # Policy update
             mean_change = self.__policy_update()
             mean_policy_changes.append(mean_change)
             if mean_change == 0:
                 break
-        return self.policy, mean_policy_changes, self.V
+        return self.policy, mean_policy_changes, mean_state_values
 
 
 if __name__ == "__main__":
