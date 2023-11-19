@@ -7,7 +7,7 @@ class MDP:
     """ Interface for the MDPs """
 
     def get_allowed_states_and_actions(self):
-        """ Return all possible states and actions in the MDP 
+        """ Return all possible states and actions in the MDP
         Returns:
             List[allowed_states], List[allowed_actions]
         """
@@ -38,7 +38,7 @@ class MDP:
             p: transition probability (float)
         """
         pass
-        
+
     def reset(self):
         """ Reset the MDP
         Returns: initial_state, reward(int), episode_end(False)
@@ -56,21 +56,21 @@ class MDP:
 
 
 class TomAndJerry(MDP):
-    """ Concrete MDP for Tom and Jerry game 
-    
+    """ Concrete MDP for Tom and Jerry game
+
     Jerry has to reach Cheeze avoiding the traps
     - Jerry stats from (0,0)
     - Rewards:
         +1 reward if Jerry reaches cheeze
         -1 reward if Jerry reaches Tom
-    - Actions: 
+    - Actions:
         Jerry can move top(0), right(1), down(2), left(3)
-    - Environment transition: 
+    - Environment transition:
         Jerry moves in the desired direction with probability 1/3
         Jerry moves perpendicular with probability 1/3
         If there is a trap/grid-border in any direction, the movement does not happen
     """
-    
+
     def __init__(self):
         self.jerry = (0, 0)  # Current position of Jerry
         self.tom = (1,3)     # Position of Tom
@@ -88,7 +88,7 @@ class TomAndJerry(MDP):
         # Get the allowed actions
         allowed_actions = list(self.allowed_actions)
         return allowed_states, allowed_actions
-    
+
     def get_terminal_states(self):
         return [self.tom, self.cheeze]
 
@@ -102,7 +102,7 @@ class TomAndJerry(MDP):
         # If the state is terminal
         if state in self.get_terminal_states():
             return 0
-        # Get the possible next_states from the current state 
+        # Get the possible next_states from the current state
         possible_next_states = set()
         dx = [-1, 0, 1, 0]
         dy = [0, 1, 0, -1]
@@ -128,7 +128,7 @@ class TomAndJerry(MDP):
     def reset(self):
         self.jerry = (0,0)
         return self.jerry, 0, False
-    
+
     def step(self, action):
         # Raise expection if the action is invalid
         if action not in self.allowed_actions:
@@ -151,36 +151,42 @@ class TomAndJerry(MDP):
             reward += self.get_reward(self.jerry, action, (new_x, new_y))
             self.jerry = (new_x, new_y)
             if reward != 0:
-                episode_end = True  
+                episode_end = True
         return self.jerry, reward, episode_end
-        
+
 
 class BitStrings(MDP):
     """ Concrete MDP for Bit Strings of size 9
 
-    9 size of strings
-    - Start from '000000000'
+    - 9 is upper limit on size of the problem
+    - Start from "All zeros" (eg: "000000000")
     - Rewards:
-        +1 reward for '010101010' or '101010101'
-        -2 reward for '111111111'
+        +1 reward for "Alternating zeros-ones" (eg: "010101010" or "101010101")
+        -2 reward for "All ones" (eg: "111111111")
     - Actions:
-        Any of the 9 bits can be flipped
-    - Environment transition: 
+        Any of the bits can be flipped
+    - Environment transition:
         If an action is taken to flip bit i, then with a 0.5 chance i+1 can can be flipped instead
         For the last bit, it is guranteed to flip as there is no next bit to it
     """
 
-    def __init__(self):
-        self.state = "000000000"
-        self.positive_terminal_states = ["010101010", "101010101"]
-        self.negative_terminal_states = ["111111111"]
+    def __init__(self, size=9):
+        """ Constructor
+        Parameters:
+            - size: size of the bitstrings used (int)
+        """
+        self.size = min(size, 9)  # 9 is the upper limit on size of the problem
+        self.start_state = "0" * self.size
+        self.positive_terminal_states = [("01"*5)[0:self.size], ("10"*5)[0:self.size]]
+        self.negative_terminal_states = ["1" * self.size]
+        self.state = self.start_state
 
     def __generate_allowed_states(self, state, allowed_states):
-        if len(state) == 9:
+        if len(state) == self.size:
             allowed_states.append(state)
             return
-        self.__generate_allowed_states(state + '1', allowed_states)
         self.__generate_allowed_states(state + '0', allowed_states)
+        self.__generate_allowed_states(state + '1', allowed_states)
         return
 
     def get_allowed_states_and_actions(self):
@@ -188,7 +194,7 @@ class BitStrings(MDP):
         allowed_states = []
         self.__generate_allowed_states("", allowed_states)
         # Get the allowed actions
-        allowed_actions = list(range(9))
+        allowed_actions = list(range(self.size))
         return allowed_states, allowed_actions
 
     def get_terminal_states(self):
@@ -196,7 +202,7 @@ class BitStrings(MDP):
 
     def get_transition_prob(self, state, action, next_state):
         # If action is out of bonds
-        if action < 0 or action > 8:
+        if action < 0 or action > self.size - 1:
             return 0
         # If the state is terminal
         if state in self.get_terminal_states():
@@ -205,7 +211,7 @@ class BitStrings(MDP):
         possible_next_states = set()
         new_bit_value = 1 - int(state[action])
         possible_next_states.add(state[0:action] + str(new_bit_value) + state[action+1:])
-        if action < 8:
+        if action < self.size - 1:
             action = action + 1
             new_bit_value = 1 - int(state[action])
             possible_next_states.add(state[0:action] + str(new_bit_value) + state[action+1:])
@@ -223,17 +229,17 @@ class BitStrings(MDP):
             return 0
 
     def reset(self):
-        self.state = "000000000"
+        self.state = self.start_state
         return self.state, 0, False
-    
+
     def step(self, action):
-        if action < 0 or action > 8:
+        if action < 0 or action > self.size - 1:
             raise Exception(f"Action at index {action} is out of bounds")
         # Do nothing if the game has ended
         if self.state in self.get_terminal_states():
             return self.state, 0, True
         # Update state using the transition model
-        if action < 8:
+        if action < self.size - 1:
             action = random.choice([action, action+1])
         new_bit_value = 1 - int(self.state[action])
         next_state = self.state[0:action] + str(new_bit_value) + self.state[action+1:]
@@ -246,7 +252,7 @@ class BitStrings(MDP):
 
 
 if __name__ == "__main__":
-    
+
     # Check the TomAndJerry MDP
     print("\nTesting Tom and Jerry MDP")
     print("- - - - - - - - - - - - -")
@@ -262,7 +268,7 @@ if __name__ == "__main__":
     print("- Number of actions: ", len(a))
     t_s = tom_and_jerry.get_terminal_states()
     print("- Terminal states: ", t_s)
-   
+
     # Check the BitStrings MDP
     print("\nTesting BitStrings MDP")
     print("- - - - - - - - - - -    ")
